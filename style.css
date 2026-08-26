@@ -1,0 +1,276 @@
+:root {
+  --header-bg: #1b3a4b;
+  --accent: #2b7de9;
+  --accent-dark: #1f5fb8;
+  --text-on-dark: #f4f7fa;
+  --surface: #ffffff;
+  --border: #d8dee3;
+  --danger: #d64545;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--surface);
+  color: #1c2733;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  background: var(--header-bg);
+  color: var(--text-on-dark);
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.app-header h1 {
+  font-size: 1.05rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  min-height: 40px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  background: var(--accent-dark);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn-secondary {
+  background: #566573;
+}
+
+.filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: #eef2f5;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.date-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.date-filters label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.date-filters input[type="date"] {
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.status-bar {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  color: #4a5a68;
+  background: #f7f9fa;
+  border-bottom: 1px solid var(--border);
+  min-height: 1.4em;
+}
+
+#map {
+  flex: 1;
+  width: 100%;
+  min-height: 300px;
+}
+
+/* Photo markers */
+.photo-marker {
+  position: relative;
+  width: 22px;
+  height: 22px;
+}
+
+.photo-marker-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.photo-marker-arrow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  margin-top: -20px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 12px solid var(--accent);
+  transform-origin: 6px 20px;
+  opacity: 0.85;
+}
+
+.photo-label {
+  display: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 5px;
+}
+
+.map-wrap.show-labels .photo-label,
+body.show-labels .leaflet-tooltip.photo-label {
+  display: block;
+}
+
+/* Leaflet popup content */
+.popup-content {
+  max-width: 220px;
+  font-size: 0.85rem;
+}
+
+.popup-thumb {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 4px;
+  cursor: zoom-in;
+  display: block;
+  margin-bottom: 0.35rem;
+  background: #eee;
+}
+
+.popup-filename {
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.popup-date,
+.popup-coords,
+.popup-distance {
+  color: #43525f;
+  margin-top: 0.15rem;
+}
+
+.popup-navigate {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+/* User location marker */
+.user-location-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2b7de9;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(43, 125, 233, 0.5);
+}
+
+/* Lightbox */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 5000;
+  padding: 1rem;
+}
+
+.lightbox.hidden {
+  display: none;
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+}
+
+.lightbox-caption {
+  color: #fff;
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .filter-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .search-input {
+    max-width: 320px;
+  }
+}

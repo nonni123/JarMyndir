@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="is">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Jarðkönnun – Myndakort</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Jarðkönnun – Myndakort</h1>
+    <div class="controls">
+      <button id="refresh-btn" class="btn" type="button">🔄 Refresh Photos</button>
+      <button id="locate-btn" class="btn" type="button">📍 My Location</button>
+    </div>
+  </header>
+
+  <div class="filter-bar">
+    <input id="search-input" class="search-input" type="search" placeholder="Leita í skráarnafni eða dagsetningu…" />
+    <div class="date-filters">
+      <label>Frá <input id="date-from" type="date" /></label>
+      <label>Til <input id="date-to" type="date" /></label>
+      <button id="clear-filters-btn" class="btn btn-secondary" type="button">Hreinsa síu</button>
+    </div>
+  </div>
+
+  <div id="status-bar" class="status-bar" role="status" aria-live="polite"></div>
+
+  <div id="map"></div>
+
+  <div id="lightbox" class="lightbox hidden">
+    <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Loka">✕</button>
+    <img id="lightbox-img" src="" alt="" />
+    <div id="lightbox-caption" class="lightbox-caption"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

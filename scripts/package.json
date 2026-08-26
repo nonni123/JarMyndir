@@ -1,0 +1,11 @@
+{
+  "name": "jardkonnun-map-build",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build-geojson.mjs"
+  },
+  "dependencies": {
+    "exifr": "^7.1.3"
+  }
+}

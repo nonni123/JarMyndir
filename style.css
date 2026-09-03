@@ -163,7 +163,8 @@ body {
   opacity: 0.85;
 }
 
-.photo-label {
+.photo-label,
+.point-label {
   display: none;
   font-size: 0.72rem;
   font-weight: 600;
@@ -171,7 +172,9 @@ body {
 }
 
 .map-wrap.show-labels .photo-label,
-body.show-labels .leaflet-tooltip.photo-label {
+.map-wrap.show-labels .point-label,
+body.show-labels .leaflet-tooltip.photo-label,
+body.show-labels .leaflet-tooltip.point-label {
   display: block;
 }
 

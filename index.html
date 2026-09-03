@@ -15,6 +15,8 @@
     <h1>Jarðkönnun – Myndakort</h1>
     <div class="controls">
       <button id="refresh-btn" class="btn" type="button">🔄 Refresh Photos</button>
+      <button id="points-btn" class="btn" type="button">📥 Punktar (CSV)</button>
+      <button id="shape-btn" class="btn" type="button">🗺️ Lag (shapefile/GeoJSON)</button>
       <button id="locate-btn" class="btn" type="button">📍 My Location</button>
     </div>
   </header>
@@ -38,9 +40,14 @@
     <div id="lightbox-caption" class="lightbox-caption"></div>
   </div>
 
+  <input type="file" id="points-input" accept=".csv,text/csv" style="display:none" />
+  <input type="file" id="shape-input" accept=".zip,.geojson,.json,application/zip,application/json" style="display:none" />
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.2/dist/proj4.js"></script>
+  <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -19,6 +19,12 @@
   const VALID_EXT = /\.(jpe?g)$/i;
   const REFRESH_CONCURRENCY = 4;
 
+  // Points CSV (mm/leg/guy) — same ISN93 projection as the field-registration CSV.
+  const ISN93 =
+    '+proj=lcc +lat_1=64.25 +lat_2=65.75 +lat_0=65 +lon_0=-19 +x_0=500000 +y_0=500000 +ellps=GRS80 +units=m +no_defs +type=crs';
+  const POINTS_CACHE_KEY = 'jkmap_csv_points_v1';
+  const SHAPE_CACHE_KEY = 'jkmap_shape_layers_v1';
+
   // ---------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------
@@ -103,12 +109,22 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
 
+  // Shapefile/GeoJSON lag er alltaf sýnilegt (ekki í layer-control) og alltaf
+  // undir punktunum — bætt við mapinu fyrst svo það lendi neðst í teiknunarröðinni.
+  const shapeLayer = L.layerGroup();
+  map.addLayer(shapeLayer);
+
   const clusterGroup = L.markerClusterGroup({
     maxClusterRadius: 60,
     spiderfyOnMaxZoom: true,
     showCoverageOnHover: false,
   });
   map.addLayer(clusterGroup);
+
+  const pointsLayer = L.layerGroup();
+  map.addLayer(pointsLayer);
+
+  L.control.layers(null, { 'Myndir': clusterGroup, 'Punktar (CSV)': pointsLayer }, { position: 'topright' }).addTo(map);
 
   function updateLabelVisibility() {
     const show = map.getZoom() >= LABEL_ZOOM_THRESHOLD;
@@ -471,10 +487,288 @@
   window.__jkmap = { openLightbox, navigateTo };
 
   // ---------------------------------------------------------------------
+  // Punktar (CSV) — sama snið og miðlæga skráningar-CSV skráin
+  // (semikommu-aðskilið, ISN93 X/Y hnit), með valfrjálsum "tegund" dálki
+  // (mm/leg/guy) sem stýrir lit/stærð, alveg eins og í aðal-appinu.
+  // ---------------------------------------------------------------------
+  const pointMarkers = [];
+
+  function parseCsvSemicolon(text) {
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // BOM
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cell += '"'; i++; } else { inQuotes = false; }
+        } else {
+          cell += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ';') {
+        row.push(cell); cell = '';
+      } else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell); cell = ''; rows.push(row); row = [];
+      } else {
+        cell += ch;
+      }
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+
+  function findColIndex(header, names) {
+    const lower = header.map((h) => (h || '').trim().toLowerCase());
+    for (const name of names) {
+      const idx = lower.indexOf(name);
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+
+  function pointTypeStyle(tegund) {
+    if (tegund === 'mm') return { radius: 9, fillColor: '#FA0000' };
+    if (tegund === 'leg') return { radius: 4, fillColor: '#3ecf8e' };
+    if (tegund === 'guy') return { radius: 4, fillColor: '#9b59d0' };
+    return { radius: 6, fillColor: '#2b7de9' };
+  }
+
+  function buildPointPopupHtml(p) {
+    const distanceHtml = userLocation
+      ? `<div class="popup-distance">Fjarlægð: ${formatDistance(
+          haversineMeters(userLocation.lat, userLocation.lon, p.lat, p.lon)
+        )}</div>`
+      : '';
+    return `
+      <div class="popup-content">
+        <div class="popup-filename">${escapeHtml(p.nafn || p.nr || p.fid)}</div>
+        ${p.gerd ? `<div class="popup-date">${escapeHtml(p.gerd)}${p.ng ? ' · ' + escapeHtml(p.ng) : ''}</div>` : ''}
+        ${p.tegund ? `<div class="popup-date">Tegund: ${escapeHtml(p.tegund)}</div>` : ''}
+        <div class="popup-coords">${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}</div>
+        ${distanceHtml}
+        <button class="btn popup-navigate" type="button"
+                onclick="window.__jkmap.navigateTo(${p.lat}, ${p.lon})">🧭 Navigate</button>
+      </div>`;
+  }
+
+  function renderCsvPoints(points) {
+    pointsLayer.clearLayers();
+    pointMarkers.length = 0;
+
+    points.forEach((p) => {
+      const style = pointTypeStyle(p.tegund);
+      const marker = L.circleMarker([p.lat, p.lon], {
+        radius: style.radius,
+        color: '#fff',
+        weight: 1.5,
+        fillColor: style.fillColor,
+        fillOpacity: 0.95,
+      });
+      marker.bindPopup(() => buildPointPopupHtml(p), { maxWidth: 260 });
+      if (!p.tegund || p.tegund === 'mm') {
+        marker.bindTooltip(p.nr || p.nafn || p.fid, {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -8],
+          className: 'point-label',
+        });
+      }
+      marker.addTo(pointsLayer);
+      pointMarkers.push(marker);
+    });
+
+    setStatus(`${points.length} punktar hlaðnir úr CSV.`);
+
+    if (points.length > 0) {
+      const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon]));
+      map.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
+    }
+  }
+
+  function parsePointsCsv(text) {
+    const rows = parseCsvSemicolon(text);
+    if (!rows.length) throw new Error('Tóm CSV-skrá');
+    const header = rows[0];
+    const idx = {
+      fid: findColIndex(header, ['fid']),
+      nr: findColIndex(header, ['nr.', 'nr']),
+      nafn: findColIndex(header, ['nafn', 'heiti', 'name']),
+      gerd: findColIndex(header, ['gerð', 'gerd']),
+      ng: findColIndex(header, ['ng']),
+      x: findColIndex(header, ['x']),
+      y: findColIndex(header, ['y']),
+      tegund: findColIndex(header, ['tegund', 'type']),
+    };
+    if (idx.x === -1 || idx.y === -1) {
+      throw new Error('Fann ekki X/Y dálka í CSV-skránni');
+    }
+
+    const points = [];
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      const x = parseFloat(row[idx.x]);
+      const y = parseFloat(row[idx.y]);
+      if (!isFinite(x) || !isFinite(y)) continue;
+      const [lon, lat] = proj4(ISN93, 'EPSG:4326', [x, y]);
+      points.push({
+        fid: idx.fid !== -1 ? (row[idx.fid] || '').trim() : String(r),
+        nr: idx.nr !== -1 ? (row[idx.nr] || '').trim() : '',
+        nafn: idx.nafn !== -1 ? (row[idx.nafn] || '').trim() : '',
+        gerd: idx.gerd !== -1 ? (row[idx.gerd] || '').trim() : '',
+        ng: idx.ng !== -1 ? (row[idx.ng] || '').trim() : '',
+        tegund: idx.tegund !== -1 ? (row[idx.tegund] || '').trim().toLowerCase() : '',
+        lat,
+        lon,
+      });
+    }
+    return points;
+  }
+
+  document.getElementById('points-btn').addEventListener('click', () => {
+    document.getElementById('points-input').click();
+  });
+
+  document.getElementById('points-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    file
+      .text()
+      .then((text) => {
+        const points = parsePointsCsv(text);
+        renderCsvPoints(points);
+        try {
+          localStorage.setItem(POINTS_CACHE_KEY, text);
+        } catch (err) {
+          console.warn('Gat ekki vistað punkta-CSV í localStorage.', err);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setStatus(`Villa við lestur punkta-CSV: ${err.message}`);
+      });
+  });
+
+  function loadCachedPoints() {
+    try {
+      const text = localStorage.getItem(POINTS_CACHE_KEY);
+      if (!text) return;
+      renderCsvPoints(parsePointsCsv(text));
+    } catch (err) {
+      console.warn('Gat ekki endurhlaðið vistaða punkta-CSV.', err);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Shapefile / GeoJSON lag — alltaf sýnilegt, ekki hægt að velja/fela á
+  // kortinu, og alltaf teiknað undir punktunum (sjá shapeLayer ofar).
+  // ---------------------------------------------------------------------
+  function reprojectIsn93IfNeeded(geojson) {
+    function walk(coords, fn) {
+      if (typeof coords[0] === 'number') return fn(coords);
+      return coords.map((c) => walk(c, fn));
+    }
+    const feats = geojson.features || [];
+    let needsReproject = false;
+    for (const f of feats) {
+      const g = f.geometry;
+      if (!g || !g.coordinates) continue;
+      walk(g.coordinates, (pt) => {
+        if (Math.abs(pt[0]) > 180 || Math.abs(pt[1]) > 90) needsReproject = true;
+        return pt;
+      });
+      break;
+    }
+    if (!needsReproject) return geojson;
+    feats.forEach((f) => {
+      const g = f.geometry;
+      if (!g || !g.coordinates) return;
+      g.coordinates = walk(g.coordinates, (pt) => proj4(ISN93, 'EPSG:4326', [pt[0], pt[1]]));
+    });
+    return geojson;
+  }
+
+  function addShapeLayer(geojson) {
+    const layer = L.geoJSON(reprojectIsn93IfNeeded(geojson), {
+      style: { color: '#6b7280', weight: 2, opacity: 0.85 },
+      pointToLayer: (f, latlng) =>
+        L.circleMarker(latlng, { radius: 4, color: '#fff', weight: 1, fillColor: '#6b7280', fillOpacity: 0.9 }),
+      onEachFeature: (feature, fl) => {
+        const props = feature.properties || {};
+        const keys = Object.keys(props).filter((k) => props[k] !== null && props[k] !== '');
+        if (!keys.length) return;
+        fl.bindPopup(keys.map((k) => `<b>${escapeHtml(k)}:</b> ${escapeHtml(props[k])}`).join('<br>'));
+      },
+    });
+    layer.addTo(shapeLayer);
+  }
+
+  function loadCachedShapes() {
+    let saved;
+    try {
+      saved = JSON.parse(localStorage.getItem(SHAPE_CACHE_KEY)) || [];
+    } catch (err) {
+      saved = [];
+    }
+    saved.forEach((s) => addShapeLayer(s.geojson));
+  }
+
+  function saveShape(name, geojson) {
+    let saved;
+    try {
+      saved = JSON.parse(localStorage.getItem(SHAPE_CACHE_KEY)) || [];
+    } catch (err) {
+      saved = [];
+    }
+    saved.push({ name, geojson });
+    try {
+      localStorage.setItem(SHAPE_CACHE_KEY, JSON.stringify(saved));
+    } catch (err) {
+      console.warn('Lagið birtist en rúmaðist ekki í geymslu (localStorage full?).', err);
+    }
+  }
+
+  document.getElementById('shape-btn').addEventListener('click', () => {
+    document.getElementById('shape-input').click();
+  });
+
+  document.getElementById('shape-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const isZip = /\.zip$/i.test(file.name);
+    const name = file.name.replace(/\.(zip|geo)?json$/i, '').replace(/\.zip$/i, '');
+    const parsed = isZip
+      ? file.arrayBuffer().then((buf) => shp(buf))
+      : file.text().then((t) => JSON.parse(t));
+
+    parsed
+      .then((result) => {
+        const collections = Array.isArray(result) ? result : [result];
+        collections.forEach((geojson) => {
+          addShapeLayer(geojson);
+          saveShape(name, geojson);
+        });
+        setStatus(`Lag flutt inn: ${name} (${collections.length} safn)`);
+      })
+      .catch((err) => {
+        console.error(err);
+        setStatus(`Villa við lestur lags: ${err.message} — er þetta zippuð shapefile eða GeoJSON?`);
+      });
+  });
+
+  // ---------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------
   updateLabelVisibility();
+  loadCachedShapes(); // undirlag - alltaf fyrst svo það haldist neðst
   rebuildMarkersFromCache(); // paint whatever's already cached from a previous visit
+  loadCachedPoints(); // paint any previously-imported points CSV
   setStatus('Sæki myndalista…');
   loadPrebuiltGeojson().then((result) => {
     rebuildMarkersFromCache();

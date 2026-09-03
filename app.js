@@ -108,10 +108,15 @@
   // ---------------------------------------------------------------------
   const map = L.map('map', { zoomControl: true }).setView([64.9631, -19.0208], 6); // Iceland default
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
+
+  const esriLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 19, attribution: 'Loftmynd &copy; Esri, Maxar, Earthstar Geographics' }
+  );
 
   // Shapefile/GeoJSON lag er alltaf sýnilegt (ekki í layer-control) og alltaf
   // undir punktunum — bætt við mapinu fyrst svo það lendi neðst í teiknunarröðinni.
@@ -128,7 +133,11 @@
   const pointsLayer = L.layerGroup();
   map.addLayer(pointsLayer);
 
-  L.control.layers(null, { 'Myndir': clusterGroup, 'Punktar (CSV)': pointsLayer }, { position: 'topright' }).addTo(map);
+  L.control.layers(
+    { 'Kort (OSM)': osmLayer, 'Loftmynd (Esri)': esriLayer },
+    { 'Myndir': clusterGroup, 'Punktar (CSV)': pointsLayer },
+    { position: 'topright' }
+  ).addTo(map);
 
   function updateLabelVisibility() {
     const show = map.getZoom() >= LABEL_ZOOM_THRESHOLD;

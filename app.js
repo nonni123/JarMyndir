@@ -35,6 +35,10 @@
   let userLocation = null; // { lat, lon, accuracy }
   let userLocationMarker = null;
   let userAccuracyCircle = null;
+  let visiblePhotos = []; // photos currently passing the search/date filters
+  let currentPoints = []; // last-imported CSV points, kept for the legend
+  const importedShapes = []; // { id, name, color, layer } for the legend + color editing
+  let shapeIdCounter = 0;
 
   // ---------------------------------------------------------------------
   // localStorage cache helpers
@@ -206,6 +210,7 @@
     });
 
     applyFilters();
+    renderLegend();
   }
 
   // ---------------------------------------------------------------------
@@ -219,7 +224,7 @@
     const to = toVal ? new Date(toVal + 'T23:59:59') : null;
 
     clusterGroup.clearLayers();
-    let visibleCount = 0;
+    visiblePhotos = [];
 
     markersByFilename.forEach((marker, filename) => {
       const photo = marker.__photo;
@@ -238,11 +243,12 @@
 
       if (matchesSearch && matchesDate) {
         clusterGroup.addLayer(marker);
-        visibleCount++;
+        visiblePhotos.push(photo);
       }
     });
 
-    setStatus(`${visibleCount} af ${markersByFilename.size} myndum sýndar.`);
+    setStatus(`${visiblePhotos.length} af ${markersByFilename.size} myndum sýndar.`);
+    updateDownloadButton();
   }
 
   document.getElementById('search-input').addEventListener('input', applyFilters);
@@ -254,6 +260,116 @@
     document.getElementById('date-to').value = '';
     applyFilters();
   });
+
+  // ---------------------------------------------------------------------
+  // Legend — photos, point types in use, and one row per imported shape
+  // layer with a color swatch the user can change live.
+  // ---------------------------------------------------------------------
+  function renderLegend() {
+    const el = document.getElementById('legend');
+    const sections = [];
+
+    if (markersByFilename.size > 0) {
+      sections.push(`
+        <div class="legend-section">
+          <h3>Myndir</h3>
+          <div class="legend-row"><span class="legend-swatch" style="background:var(--photo)"></span><span class="legend-label">Ljósmynd</span></div>
+        </div>`);
+    }
+
+    const typesInUse = new Set(currentPoints.map((p) => p.tegund || ''));
+    if (typesInUse.size > 0) {
+      const rows = [];
+      if (typesInUse.has('mm')) rows.push(['#FA0000', 'mm — mastramiðja']);
+      if (typesInUse.has('leg')) rows.push(['#3ecf8e', 'leg — leggur']);
+      if (typesInUse.has('guy')) rows.push(['#9b59d0', 'guy — stag']);
+      if (typesInUse.has('')) rows.push(['#2b7de9', 'Punktur (án tegundar)']);
+      sections.push(`
+        <div class="legend-section">
+          <h3>Punktar</h3>
+          ${rows.map(([color, label]) => `
+            <div class="legend-row"><span class="legend-swatch" style="background:${color}"></span><span class="legend-label">${escapeHtml(label)}</span></div>
+          `).join('')}
+        </div>`);
+    }
+
+    if (importedShapes.length > 0) {
+      sections.push(`
+        <div class="legend-section">
+          <h3>Lög</h3>
+          ${importedShapes.map((s) => `
+            <div class="legend-row">
+              <input type="color" class="legend-color-input" value="${s.color}" data-shape-id="${s.id}" title="Breyta lit" />
+              <span class="legend-label">${escapeHtml(s.name)}</span>
+            </div>
+          `).join('')}
+        </div>`);
+    }
+
+    if (!sections.length) {
+      el.innerHTML = '';
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = 'block';
+    el.innerHTML = `<h3>Skýring</h3>${sections.join('')}`;
+
+    el.querySelectorAll('.legend-color-input').forEach((input) => {
+      input.addEventListener('input', () => {
+        const id = Number(input.dataset.shapeId);
+        const shape = importedShapes.find((s) => s.id === id);
+        if (!shape) return;
+        shape.color = input.value;
+        shape.layer.setStyle({ color: shape.color, fillColor: shape.color });
+        persistShapeColors();
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Download visible photos as a .zip
+  // ---------------------------------------------------------------------
+  function updateDownloadButton() {
+    const btn = document.getElementById('download-btn');
+    btn.disabled = visiblePhotos.length === 0;
+    btn.textContent = visiblePhotos.length > 0 ? `⬇ Sækja myndir (${visiblePhotos.length})` : '⬇ Sækja myndir';
+  }
+
+  async function downloadVisiblePhotos() {
+    if (!visiblePhotos.length) return;
+    const btn = document.getElementById('download-btn');
+    btn.disabled = true;
+    const zip = new JSZip();
+    let done = 0;
+
+    try {
+      for (const photo of visiblePhotos) {
+        setStatus(`Sæki myndir fyrir niðurhal: ${done}/${visiblePhotos.length}…`);
+        try {
+          const res = await fetch(rawUrl(photo.path));
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          zip.file(photo.filename, await res.blob());
+        } catch (err) {
+          console.warn(`Sleppti ${photo.filename} í niðurhali:`, err);
+        }
+        done++;
+      }
+
+      setStatus('Pakka myndum saman…');
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `jardkonnun-myndir-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus(`Niðurhal tilbúið: ${done} myndir.`);
+    } finally {
+      updateDownloadButton();
+    }
+  }
+
+  document.getElementById('download-btn').addEventListener('click', downloadVisiblePhotos);
 
   // ---------------------------------------------------------------------
   // Initial load: prebuilt photos.geojson (fast path, built by GitHub Action)
@@ -559,6 +675,7 @@
   function renderCsvPoints(points) {
     pointsLayer.clearLayers();
     pointMarkers.length = 0;
+    currentPoints = points;
 
     points.forEach((p) => {
       const style = pointTypeStyle(p.tegund);
@@ -583,6 +700,7 @@
     });
 
     setStatus(`${points.length} punktar hlaðnir úr CSV.`);
+    renderLegend();
 
     if (points.length > 0) {
       const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon]));
@@ -693,11 +811,14 @@
     return geojson;
   }
 
-  function addShapeLayer(geojson) {
+  const DEFAULT_SHAPE_COLOR = '#6b7280';
+
+  function addShapeLayer(name, geojson, color) {
+    const shapeColor = color || DEFAULT_SHAPE_COLOR;
     const layer = L.geoJSON(reprojectIsn93IfNeeded(geojson), {
-      style: { color: '#6b7280', weight: 2, opacity: 0.85 },
+      style: { color: shapeColor, weight: 2, opacity: 0.85 },
       pointToLayer: (f, latlng) =>
-        L.circleMarker(latlng, { radius: 4, color: '#fff', weight: 1, fillColor: '#6b7280', fillOpacity: 0.9 }),
+        L.circleMarker(latlng, { radius: 4, color: '#fff', weight: 1, fillColor: shapeColor, fillOpacity: 0.9 }),
       onEachFeature: (feature, fl) => {
         const props = feature.properties || {};
         const keys = Object.keys(props).filter((k) => props[k] !== null && props[k] !== '');
@@ -706,6 +827,27 @@
       },
     });
     layer.addTo(shapeLayer);
+    importedShapes.push({ id: shapeIdCounter++, name, color: shapeColor, layer });
+    renderLegend();
+  }
+
+  function persistShapeColors() {
+    let saved;
+    try {
+      saved = JSON.parse(localStorage.getItem(SHAPE_CACHE_KEY)) || [];
+    } catch (err) {
+      saved = [];
+    }
+    // Colors are matched back up by position on load, so keep the stored
+    // geojson but refresh every color from current legend state.
+    saved.forEach((s, i) => {
+      if (importedShapes[i]) s.color = importedShapes[i].color;
+    });
+    try {
+      localStorage.setItem(SHAPE_CACHE_KEY, JSON.stringify(saved));
+    } catch (err) {
+      console.warn('Gat ekki vistað lit á lagi (localStorage full?).', err);
+    }
   }
 
   function loadCachedShapes() {
@@ -715,17 +857,17 @@
     } catch (err) {
       saved = [];
     }
-    saved.forEach((s) => addShapeLayer(s.geojson));
+    saved.forEach((s) => addShapeLayer(s.name, s.geojson, s.color));
   }
 
-  function saveShape(name, geojson) {
+  function saveShape(name, geojson, color) {
     let saved;
     try {
       saved = JSON.parse(localStorage.getItem(SHAPE_CACHE_KEY)) || [];
     } catch (err) {
       saved = [];
     }
-    saved.push({ name, geojson });
+    saved.push({ name, geojson, color });
     try {
       localStorage.setItem(SHAPE_CACHE_KEY, JSON.stringify(saved));
     } catch (err) {
@@ -751,8 +893,8 @@
       .then((result) => {
         const collections = Array.isArray(result) ? result : [result];
         collections.forEach((geojson) => {
-          addShapeLayer(geojson);
-          saveShape(name, geojson);
+          addShapeLayer(name, geojson, DEFAULT_SHAPE_COLOR);
+          saveShape(name, geojson, DEFAULT_SHAPE_COLOR);
         });
         setStatus(`Lag flutt inn: ${name} (${collections.length} safn)`);
       })

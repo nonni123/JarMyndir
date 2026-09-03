@@ -1,11 +1,14 @@
 :root {
-  --header-bg: #1b3a4b;
-  --accent: #2b7de9;
-  --accent-dark: #1f5fb8;
-  --text-on-dark: #f4f7fa;
-  --surface: #ffffff;
-  --border: #d8dee3;
-  --danger: #d64545;
+  --bg: #14161a;
+  --surface: #1e2127;
+  --surface-2: #262a31;
+  --line: #333844;
+  --text: #f2f3f5;
+  --muted: #9ba1ab;
+  --red: #fa0000;
+  --red-dim: #7d0505;
+  --photo: #9ba1ab;
+  --locate: #2b7de9;
 }
 
 * {
@@ -16,9 +19,9 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--surface);
-  color: #1c2733;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
 }
 
 body {
@@ -28,42 +31,64 @@ body {
 }
 
 .app-header {
-  background: var(--header-bg);
-  color: var(--text-on-dark);
+  background: var(--bg);
+  color: var(--text);
   padding: 0.6rem 0.8rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  background: var(--red);
+  border-radius: 6px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo svg {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 .app-header h1 {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   margin: 0;
   white-space: nowrap;
+  font-weight: 700;
 }
 
 .controls {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .btn {
   min-height: 40px;
   padding: 0.45rem 0.8rem;
-  font-size: 0.9rem;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
   cursor: pointer;
   touch-action: manipulation;
 }
 
 .btn:active {
-  background: var(--accent-dark);
+  background: var(--surface);
 }
 
 .btn:disabled {
@@ -72,7 +97,18 @@ body {
 }
 
 .btn-secondary {
-  background: #566573;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.btn-primary {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.btn-primary:active {
+  background: var(--red-dim);
 }
 
 .filter-bar {
@@ -80,8 +116,8 @@ body {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.6rem 0.8rem;
-  background: #eef2f5;
-  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
 
 .search-input {
@@ -89,8 +125,10 @@ body {
   min-height: 40px;
   padding: 0.4rem 0.6rem;
   font-size: 0.95rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .date-filters {
@@ -99,6 +137,7 @@ body {
   align-items: center;
   gap: 0.6rem;
   font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .date-filters label {
@@ -109,23 +148,100 @@ body {
 
 .date-filters input[type="date"] {
   padding: 0.3rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .status-bar {
   padding: 0.3rem 0.8rem;
-  font-size: 0.8rem;
-  color: #4a5a68;
-  background: #f7f9fa;
-  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
   min-height: 1.4em;
+}
+
+.map-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
 }
 
 #map {
   flex: 1;
   width: 100%;
   min-height: 300px;
+}
+
+/* Legend */
+.legend {
+  position: absolute;
+  left: 10px;
+  bottom: 24px;
+  z-index: 900;
+  background: rgba(30, 33, 39, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  max-width: 220px;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.legend h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+
+.legend-row + .legend-row {
+  margin-top: 0.1rem;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  flex: 0 0 auto;
+}
+
+.legend-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-color-input {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.legend-section + .legend-section {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
 }
 
 /* Photo markers */
@@ -143,7 +259,7 @@ body {
   height: 14px;
   margin: -7px 0 0 -7px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--photo);
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
@@ -158,9 +274,9 @@ body {
   margin-top: -20px;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-bottom: 12px solid var(--accent);
+  border-bottom: 12px solid var(--photo);
   transform-origin: 6px 20px;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .photo-label,
@@ -169,6 +285,10 @@ body {
   font-size: 0.72rem;
   font-weight: 600;
   padding: 1px 5px;
+  background: rgba(20, 22, 26, 0.85) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
 }
 
 .map-wrap.show-labels .photo-label,
@@ -179,6 +299,12 @@ body.show-labels .leaflet-tooltip.point-label {
 }
 
 /* Leaflet popup content */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .popup-content {
   max-width: 220px;
   font-size: 0.85rem;
@@ -192,7 +318,7 @@ body.show-labels .leaflet-tooltip.point-label {
   cursor: zoom-in;
   display: block;
   margin-bottom: 0.35rem;
-  background: #eee;
+  background: var(--surface-2);
 }
 
 .popup-filename {
@@ -203,13 +329,20 @@ body.show-labels .leaflet-tooltip.point-label {
 .popup-date,
 .popup-coords,
 .popup-distance {
-  color: #43525f;
+  color: var(--muted);
   margin-top: 0.15rem;
 }
 
 .popup-navigate {
   margin-top: 0.5rem;
   width: 100%;
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.popup-navigate:active {
+  background: var(--red-dim);
 }
 
 /* User location marker */
@@ -217,7 +350,7 @@ body.show-labels .leaflet-tooltip.point-label {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #2b7de9;
+  background: var(--locate);
   border: 3px solid #fff;
   box-shadow: 0 0 0 2px rgba(43, 125, 233, 0.5);
 }
@@ -226,7 +359,7 @@ body.show-labels .leaflet-tooltip.point-label {
 .lightbox {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(0, 0, 0, 0.94);
   display: flex;
   flex-direction: column;
   align-items: center;

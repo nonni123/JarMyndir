@@ -428,9 +428,32 @@
   }
 
   // ---------------------------------------------------------------------
+  // Sameiginlegt EXIF-lestur fyrir bæði GitHub- og Cloudinary-myndir.
+  // Cloudinary-upphalið notar núna resource_type "raw" svo GPS-EXIF sem er
+  // skrifað inn í myndina á símanum (buildExifSegment) helst óskert — sama
+  // EXIF-lestur virkar því fyrir báðar myndaleiðir. Myndir sem forritið
+  // sjálft tekur skrifa dagsetningu í staðlaða "DateTime" merkið (0x0132),
+  // ekki DateTimeOriginal, svo það er tekið með í leitinni.
+  // ---------------------------------------------------------------------
+  async function readExifFromBuffer(buffer) {
+    const gps = await exifr.gps(buffer).catch(() => null);
+    const tags = await exifr
+      .parse(buffer, { pick: ['DateTimeOriginal', 'CreateDate', 'DateTime', 'ModifyDate', 'GPSImgDirection'] })
+      .catch(() => null);
+    const rawDate = tags?.DateTimeOriginal || tags?.CreateDate || tags?.DateTime || tags?.ModifyDate || null;
+    return {
+      lat: gps && typeof gps.latitude === 'number' ? gps.latitude : null,
+      lon: gps && typeof gps.longitude === 'number' ? gps.longitude : null,
+      date: rawDate ? new Date(rawDate).toISOString() : null,
+      heading: typeof tags?.GPSImgDirection === 'number' ? tags.GPSImgDirection : null,
+    };
+  }
+
+  // ---------------------------------------------------------------------
   // Cloudinary-myndir — lesnar úr "Ljósmynd" dálki miðlægu CSV skráarinnar.
-  // Cloudinary sviptir GPS-EXIF af myndunum við afhendingu, svo þær eru
-  // staðsettar á hnitum punktsins (X/Y) sem myndin tilheyrir í staðinn.
+  // GPS-EXIF er lesið beint úr myndinni eins og fyrir GitHub-myndir; hnit
+  // punktsins (X/Y) eru bara notuð sem varaleið ef mynd reynist einhverra
+  // hluta vegna EXIF-laus.
   // ---------------------------------------------------------------------
   async function loadCloudPhotosFromCsv() {
     try {
@@ -451,7 +474,7 @@
         throw new Error('Fann ekki X/Y/Ljósmynd dálka í miðlægu CSV skránni');
       }
 
-      let added = 0;
+      const newRefs = [];
       for (let r = 1; r < rows.length; r++) {
         const row = rows[r];
         const csvVal = (row[idx.ljosmynd] || '').trim();
@@ -460,32 +483,42 @@
         const cloudRefs = csvVal
           .split(',')
           .map((s) => s.trim())
-          .filter((ref) => /^https?:\/\//i.test(ref));
+          .filter((ref) => /^https?:\/\//i.test(ref) && !photoCache.has(ref));
         if (!cloudRefs.length) continue; // bare GitHub filenames are handled by the EXIF path
 
         const x = parseFloat(row[idx.x]);
         const y = parseFloat(row[idx.y]);
-        if (!isFinite(x) || !isFinite(y)) continue;
-        const [lon, lat] = proj4(ISN93, 'EPSG:4326', [x, y]);
-        const date = idx.dagsetning !== -1 ? (row[idx.dagsetning] || '').trim() || null : null;
+        const [fallbackLon, fallbackLat] =
+          isFinite(x) && isFinite(y) ? proj4(ISN93, 'EPSG:4326', [x, y]) : [null, null];
+        const fallbackDate = idx.dagsetning !== -1 ? (row[idx.dagsetning] || '').trim() || null : null;
 
-        cloudRefs.forEach((url) => {
-          const existing = photoCache.get(url);
-          if (existing) return; // Cloudinary URLs are stable once uploaded — nothing to refresh
-          photoCache.set(url, {
-            id: url,
-            filename: decodeURIComponent(url.split('/').pop().split('?')[0]) || url,
-            path: null,
-            imageUrl: url,
-            sha: url,
-            lat,
-            lon,
-            date,
-            heading: null,
-          });
-          added++;
-        });
+        cloudRefs.forEach((url) => newRefs.push({ url, fallbackLat, fallbackLon, fallbackDate }));
       }
+
+      let added = 0;
+      await runWithConcurrency(newRefs, REFRESH_CONCURRENCY, async (ref) => {
+        const filename = decodeURIComponent(ref.url.split('/').pop().split('?')[0]) || ref.url;
+        let exif = { lat: null, lon: null, date: null, heading: null };
+        try {
+          const imgRes = await fetch(ref.url);
+          if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`);
+          exif = await readExifFromBuffer(await imgRes.arrayBuffer());
+        } catch (err) {
+          console.warn(`Gat ekki lesið EXIF úr ${filename}, nota hnit punktsins í staðinn:`, err);
+        }
+        photoCache.set(ref.url, {
+          id: ref.url,
+          filename,
+          path: null,
+          imageUrl: ref.url,
+          sha: ref.url,
+          lat: exif.lat ?? ref.fallbackLat,
+          lon: exif.lon ?? ref.fallbackLon,
+          date: exif.date || ref.fallbackDate,
+          heading: exif.heading,
+        });
+        added++;
+      });
 
       saveCache();
       return { ok: true, added };
@@ -513,13 +546,9 @@
   async function readExifForFile(item) {
     const res = await fetch(item.download_url);
     if (!res.ok) throw new Error(`Gat ekki sótt ${item.name}: HTTP ${res.status}`);
-    const buffer = await res.arrayBuffer();
-    const gps = await exifr.gps(buffer).catch(() => null);
-    const tags = await exifr
-      .parse(buffer, { pick: ['DateTimeOriginal', 'CreateDate', 'GPSImgDirection'] })
-      .catch(() => null);
+    const exif = await readExifFromBuffer(await res.arrayBuffer());
 
-    if (!gps || typeof gps.latitude !== 'number' || typeof gps.longitude !== 'number') {
+    if (exif.lat == null || exif.lon == null) {
       return {
         id: item.name,
         filename: item.name,
@@ -533,16 +562,15 @@
       };
     }
 
-    const rawDate = tags?.DateTimeOriginal || tags?.CreateDate || null;
     return {
       id: item.name,
       filename: item.name,
       path: `${IMAGES_PATH}/${item.name}`,
       sha: item.sha,
-      lat: gps.latitude,
-      lon: gps.longitude,
-      date: rawDate ? new Date(rawDate).toISOString() : null,
-      heading: typeof tags?.GPSImgDirection === 'number' ? tags.GPSImgDirection : null,
+      lat: exif.lat,
+      lon: exif.lon,
+      date: exif.date,
+      heading: exif.heading,
     };
   }
 

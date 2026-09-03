@@ -14,6 +14,13 @@
     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${IMAGES_PATH}?ref=${REPO_BRANCH}`;
   const GEOJSON_URL = 'photos.geojson';
 
+  // Nýrri myndir eru núna hlaðnar beint upp á Cloudinary (sjá "Ljósmynd"
+  // dálkinn í miðlægu CSV skránni — annaðhvort ber GitHub-skráarheiti fyrir
+  // eldri myndir, eða full Cloudinary-slóð fyrir nýjar). Cloudinary sviptir
+  // GPS-EXIF af myndunum við afhendingu, svo þessar myndir eru staðsettar á
+  // hnitum punktsins sjálfs (X/Y dálkarnir) í stað þess að lesa EXIF.
+  const CENTRAL_CSV_URL = `${RAW_BASE}/Jardkonnun2026_central.csv`;
+
   const CACHE_KEY = 'jkmap_photo_cache_v1';
   const LABEL_ZOOM_THRESHOLD = 15;
   const VALID_EXT = /\.(jpe?g)$/i;
@@ -92,6 +99,12 @@
     return `${RAW_BASE}/${relPath}`;
   }
 
+  // Cloudinary-myndir bera sína eigin fullu slóð (imageUrl); eldri myndir eru
+  // sóttar af GitHub út frá path-inu eins og áður.
+  function photoImageUrl(photo) {
+    return photo.imageUrl || rawUrl(photo.path);
+  }
+
   function isIOS() {
     return (
       /iP(hone|od|ad)/.test(navigator.platform) ||
@@ -163,7 +176,7 @@
   }
 
   function buildPopupHtml(photo) {
-    const imgUrl = rawUrl(photo.path);
+    const imgUrl = photoImageUrl(photo);
     const dateHtml = photo.date ? new Date(photo.date).toLocaleString('is-IS') : 'Óþekkt dagsetning';
     const distanceHtml = userLocation
       ? `<div class="popup-distance">Fjarlægð: ${formatDistance(
@@ -186,7 +199,7 @@
   function createOrUpdateMarker(photo) {
     if (photo.lat == null || photo.lon == null) return null;
 
-    let marker = markersByFilename.get(photo.filename);
+    let marker = markersByFilename.get(photo.id);
     if (!marker) {
       marker = L.marker([photo.lat, photo.lon], { icon: photoIcon(photo.heading) });
       marker.bindTooltip(photo.filename, {
@@ -196,7 +209,7 @@
         className: 'photo-label',
       });
       marker.bindPopup(() => buildPopupHtml(photo), { maxWidth: 260 });
-      markersByFilename.set(photo.filename, marker);
+      markersByFilename.set(photo.id, marker);
     } else {
       marker.setLatLng([photo.lat, photo.lon]);
       marker.setIcon(photoIcon(photo.heading));
@@ -207,9 +220,9 @@
   }
 
   function rebuildMarkersFromCache() {
-    markersByFilename.forEach((marker, filename) => {
-      if (!photoCache.has(filename) || photoCache.get(filename).invalid) {
-        markersByFilename.delete(filename);
+    markersByFilename.forEach((marker, id) => {
+      if (!photoCache.has(id) || photoCache.get(id).invalid) {
+        markersByFilename.delete(id);
       }
     });
 
@@ -235,11 +248,11 @@
     clusterGroup.clearLayers();
     visiblePhotos = [];
 
-    markersByFilename.forEach((marker, filename) => {
+    markersByFilename.forEach((marker) => {
       const photo = marker.__photo;
       const dateStr = photo.date ? new Date(photo.date).toLocaleString('is-IS') : '';
       const matchesSearch =
-        !q || filename.toLowerCase().includes(q) || dateStr.toLowerCase().includes(q);
+        !q || photo.filename.toLowerCase().includes(q) || dateStr.toLowerCase().includes(q);
 
       let matchesDate = true;
       if (photo.date && (from || to)) {
@@ -355,7 +368,7 @@
       for (const photo of visiblePhotos) {
         setStatus(`Sæki myndir fyrir niðurhal: ${done}/${visiblePhotos.length}…`);
         try {
-          const res = await fetch(rawUrl(photo.path));
+          const res = await fetch(photoImageUrl(photo));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           zip.file(photo.filename, await res.blob());
         } catch (err) {
@@ -395,6 +408,7 @@
         const existing = photoCache.get(props.filename);
         if (existing && existing.sha === props.sha) continue; // already have this exact version
         photoCache.set(props.filename, {
+          id: props.filename,
           filename: props.filename,
           path: props.path,
           sha: props.sha,
@@ -409,6 +423,74 @@
       return { ok: true, added, total: (geojson.features || []).length };
     } catch (err) {
       console.warn('Could not load photos.geojson (Action may not have run yet).', err);
+      return { ok: false };
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Cloudinary-myndir — lesnar úr "Ljósmynd" dálki miðlægu CSV skráarinnar.
+  // Cloudinary sviptir GPS-EXIF af myndunum við afhendingu, svo þær eru
+  // staðsettar á hnitum punktsins (X/Y) sem myndin tilheyrir í staðinn.
+  // ---------------------------------------------------------------------
+  async function loadCloudPhotosFromCsv() {
+    try {
+      const res = await fetch(`${CENTRAL_CSV_URL}?_=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const rows = parseCsvSemicolon(text);
+      if (!rows.length) throw new Error('Tóm CSV-skrá');
+
+      const header = rows[0];
+      const idx = {
+        x: findColIndex(header, ['x']),
+        y: findColIndex(header, ['y']),
+        ljosmynd: findColIndex(header, ['ljósmynd', 'ljosmynd']),
+        dagsetning: findColIndex(header, ['dagsetning']),
+      };
+      if (idx.x === -1 || idx.y === -1 || idx.ljosmynd === -1) {
+        throw new Error('Fann ekki X/Y/Ljósmynd dálka í miðlægu CSV skránni');
+      }
+
+      let added = 0;
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const csvVal = (row[idx.ljosmynd] || '').trim();
+        if (!csvVal) continue;
+
+        const cloudRefs = csvVal
+          .split(',')
+          .map((s) => s.trim())
+          .filter((ref) => /^https?:\/\//i.test(ref));
+        if (!cloudRefs.length) continue; // bare GitHub filenames are handled by the EXIF path
+
+        const x = parseFloat(row[idx.x]);
+        const y = parseFloat(row[idx.y]);
+        if (!isFinite(x) || !isFinite(y)) continue;
+        const [lon, lat] = proj4(ISN93, 'EPSG:4326', [x, y]);
+        const date = idx.dagsetning !== -1 ? (row[idx.dagsetning] || '').trim() || null : null;
+
+        cloudRefs.forEach((url) => {
+          const existing = photoCache.get(url);
+          if (existing) return; // Cloudinary URLs are stable once uploaded — nothing to refresh
+          photoCache.set(url, {
+            id: url,
+            filename: decodeURIComponent(url.split('/').pop().split('?')[0]) || url,
+            path: null,
+            imageUrl: url,
+            sha: url,
+            lat,
+            lon,
+            date,
+            heading: null,
+          });
+          added++;
+        });
+      }
+
+      saveCache();
+      return { ok: true, added };
+    } catch (err) {
+      console.warn('Gat ekki sótt Cloudinary-myndir úr miðlægu CSV skránni.', err);
       return { ok: false };
     }
   }
@@ -439,6 +521,7 @@
 
     if (!gps || typeof gps.latitude !== 'number' || typeof gps.longitude !== 'number') {
       return {
+        id: item.name,
         filename: item.name,
         path: `${IMAGES_PATH}/${item.name}`,
         sha: item.sha,
@@ -452,6 +535,7 @@
 
     const rawDate = tags?.DateTimeOriginal || tags?.CreateDate || null;
     return {
+      id: item.name,
       filename: item.name,
       path: `${IMAGES_PATH}/${item.name}`,
       sha: item.sha,
@@ -484,9 +568,10 @@
       const listing = await fetchFolderListing();
       const liveNames = new Set(listing.map((it) => it.name));
 
-      // Drop cache entries for files no longer in the repo.
-      Array.from(photoCache.keys()).forEach((name) => {
-        if (!liveNames.has(name)) photoCache.delete(name);
+      // Drop cache entries for legacy GitHub files no longer in the repo.
+      // Cloudinary entries (imageUrl set) aren't part of this listing at all.
+      Array.from(photoCache.entries()).forEach(([id, photo]) => {
+        if (!photo.imageUrl && !liveNames.has(id)) photoCache.delete(id);
       });
 
       const toProcess = listing.filter((it) => {
@@ -494,18 +579,11 @@
         return !cached || cached.sha !== it.sha;
       });
 
-      if (toProcess.length === 0) {
-        saveCache();
-        rebuildMarkersFromCache();
-        setStatus(`Engar nýjar myndir. ${photoCache.size} myndir samtals.`);
-        return;
-      }
-
       let done = 0;
       await runWithConcurrency(toProcess, REFRESH_CONCURRENCY, async (item) => {
         try {
           const photo = await readExifForFile(item);
-          photoCache.set(photo.filename, photo);
+          photoCache.set(photo.id, photo);
         } catch (err) {
           console.warn(`Villa við að lesa ${item.name}:`, err);
         }
@@ -513,9 +591,12 @@
         setStatus(`Les EXIF: ${done}/${toProcess.length} nýjar myndir…`);
       });
 
+      const cloudResult = await loadCloudPhotosFromCsv();
+
       saveCache();
       rebuildMarkersFromCache();
-      setStatus(`Uppfært kl. ${new Date().toLocaleTimeString('is-IS')} — ${toProcess.length} nýjar/breyttar myndir, ${photoCache.size} samtals.`);
+      const cloudNote = cloudResult.ok ? `, ${cloudResult.added} nýjar úr Cloudinary` : '';
+      setStatus(`Uppfært kl. ${new Date().toLocaleTimeString('is-IS')} — ${toProcess.length} nýjar/breyttar úr myndir/${cloudNote}, ${photoCache.size} samtals.`);
     } catch (err) {
       console.error(err);
       setStatus(`Villa við endurhleðslu: ${err.message}`);
@@ -921,12 +1002,15 @@
   rebuildMarkersFromCache(); // paint whatever's already cached from a previous visit
   loadCachedPoints(); // paint any previously-imported points CSV
   setStatus('Sæki myndalista…');
-  loadPrebuiltGeojson().then((result) => {
+  Promise.all([loadPrebuiltGeojson(), loadCloudPhotosFromCsv()]).then(([geoResult, cloudResult]) => {
     rebuildMarkersFromCache();
-    if (result.ok) {
-      setStatus(`${photoCache.size} myndir hlaðnar (${result.added} nýjar/breyttar úr photos.geojson).`);
+    const addedCloud = cloudResult.ok ? cloudResult.added : 0;
+    if (geoResult.ok) {
+      setStatus(`${photoCache.size} myndir hlaðnar (${geoResult.added} nýjar/breyttar úr photos.geojson, ${addedCloud} úr Cloudinary).`);
+    } else if (cloudResult.ok) {
+      setStatus(`${photoCache.size} myndir hlaðnar (${addedCloud} úr Cloudinary). photos.geojson fannst ekki — ýttu á "🔄 Refresh Photos" fyrir eldri myndir.`);
     } else {
-      setStatus('photos.geojson fannst ekki enn — ýttu á "🔄 Refresh Photos" til að lesa myndir beint.');
+      setStatus('Engin gögn fundust enn — ýttu á "🔄 Refresh Photos" til að lesa myndir beint.');
     }
 
     if (markersByFilename.size > 0) {

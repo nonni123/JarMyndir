@@ -536,6 +536,12 @@
     const res = await fetch(CONTENTS_API_URL, {
       headers: { Accept: 'application/vnd.github+json' },
     });
+    if (res.status === 404) {
+      // Tóm/horfin mappa - git geymir ekki tómar möppur, svo GitHub API
+      // skilar 404 um leið og síðustu skránni er eytt. Það er ekki villa,
+      // bara "engar eldri myndir eftir" (allt komið á Cloudinary).
+      return [];
+    }
     if (!res.ok) {
       throw new Error(`GitHub API villa: HTTP ${res.status}`);
     }

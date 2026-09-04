@@ -29,7 +29,7 @@ async function listAllResources() {
   let cursor = undefined;
   const expression = `(asset_folder="${FOLDER_NAME}" OR public_id:${FOLDER_PREFIX}*) AND resource_type:image`;
   do {
-    const body = { expression, max_results: 500 };
+    const body = { expression, max_results: 500, with_field: ['original_filename'] };
     if (cursor) body.next_cursor = cursor;
 
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search`, {
@@ -91,17 +91,28 @@ async function main() {
   let failed = 0;
 
   for (const resource of resources) {
+    // Cloudinary býr til slembið public_id fyrir myndir dregnar beint inn í
+    // Media Library (nema "use filename" sé virkjað) - en varðveitir samt
+    // upprunalega skráarheitið sér í original_filename (án endingar).
+    const baseName = resource.original_filename
+      ? resource.original_filename
+      : resource.public_id.startsWith(FOLDER_PREFIX)
+        ? resource.public_id.slice(FOLDER_PREFIX.length)
+        : resource.public_id.split('/').pop();
+    const filename = `${baseName}.${resource.format}`;
+
     const prev = existingByPublicId.get(resource.public_id);
     if (prev && prev.properties.version === resource.version) {
-      features.push(prev); // óbreytt síðan síðast - ekki lesa EXIF aftur
+      // Óbreytt síðan síðast - ekki lesa EXIF aftur, en endurnýja nafn/slóð
+      // úr núverandi Cloudinary-gögnum (ódýrt) svo eldri rangnefni lagist líka.
+      features.push({
+        ...prev,
+        properties: { ...prev.properties, filename, url: resource.secure_url },
+      });
       skipped++;
       continue;
     }
 
-    const baseName = resource.public_id.startsWith(FOLDER_PREFIX)
-      ? resource.public_id.slice(FOLDER_PREFIX.length)
-      : resource.public_id.split('/').pop();
-    const filename = `${baseName}.${resource.format}`;
     try {
       const exif = await readExifFromUrl(resource.secure_url);
       if (exif.lat == null || exif.lon == null) {

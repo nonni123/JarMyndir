@@ -742,6 +742,7 @@
           filename: props.filename,
           imageUrl: props.url,
           sha: props.version,
+          source: 'cloudinary',
           lat,
           lon,
           date: props.date,
@@ -774,8 +775,11 @@
       const listing = await fetchOldProjectListing();
       const liveNames = new Set(listing.map((it) => it.name));
 
-      Array.from(oldPhotoCache.keys()).forEach((id) => {
-        if (!liveNames.has(id)) oldPhotoCache.delete(id);
+      // Aðeins hreinsa GitHub-upprunnar færslur héðan - Cloudinary-færslur
+      // (úr loadOldProjectGeojson) eiga ekkert erindi í þessa möppulistun
+      // og mega ekki hverfa bara af því þær eru ekki GitHub-skrár.
+      Array.from(oldPhotoCache.entries()).forEach(([id, photo]) => {
+        if (photo.source === 'github' && !liveNames.has(id)) oldPhotoCache.delete(id);
       });
 
       const toProcess = listing.filter((it) => {
@@ -793,6 +797,7 @@
             filename: item.name,
             imageUrl: `${OLD_PROJECT_RAW_BASE}/${OLD_PROJECT_PATH}/${item.name}`,
             sha: item.sha,
+            source: 'github',
             lat: exif.lat,
             lon: exif.lon,
             date: exif.date,

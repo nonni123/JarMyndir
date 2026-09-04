@@ -155,6 +155,13 @@
   // ---------------------------------------------------------------------
   const map = L.map('map', { zoomControl: true }).setView([64.9631, -19.0208], 6); // Iceland default
 
+  // Leaflet teiknar tooltip-pane (650) fyrir ofan marker-pane (600) sjálfgefið,
+  // svo nöfn hylja punktana þegar margar myndir eru á sama stað. Eigið "label"
+  // pane með lægra z-index tryggir að punkturinn sjálfur sé alltaf efst.
+  map.createPane('labelPane');
+  map.getPane('labelPane').style.zIndex = 550;
+  map.getPane('labelPane').style.pointerEvents = 'none';
+
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -248,6 +255,7 @@
         direction: 'top',
         offset: [0, -14],
         className: 'photo-label',
+        pane: 'labelPane',
       });
       marker.bindPopup(() => buildPopupHtml(photo), { maxWidth: 260 });
       markerMap.set(photo.id, marker);
@@ -1071,6 +1079,7 @@
           direction: 'top',
           offset: [0, -8],
           className: 'point-label',
+          pane: 'labelPane',
         });
       }
       marker.addTo(pointsLayer);

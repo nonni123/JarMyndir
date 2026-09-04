@@ -690,6 +690,23 @@
   document.getElementById('locate-btn').addEventListener('click', locateUser);
 
   // ---------------------------------------------------------------------
+  // Hreinsa gögn — hendir öllu staðbundnu vistuðu ástandi (myndir, punktar,
+  // lög) og endurhleður síðuna hreina. Gagnlegt þegar gömul localStorage-
+  // gögn úr fyrri heimsóknum flækjast fyrir (t.d. eftir kóðabreytingu).
+  // ---------------------------------------------------------------------
+  document.getElementById('clear-cache-btn').addEventListener('click', () => {
+    if (!confirm('Hreinsa öll vistuð gögn (myndir, punktar, lög) úr þessum vafra og endurhlaða?')) return;
+    [CACHE_KEY, POINTS_CACHE_KEY, SHAPE_CACHE_KEY].forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (err) {
+        console.warn(`Gat ekki hreinsað ${key}.`, err);
+      }
+    });
+    location.reload();
+  });
+
+  // ---------------------------------------------------------------------
   // Lightbox + navigation — exposed for inline onclick handlers in popups.
   // ---------------------------------------------------------------------
   function openLightbox(url, filename) {

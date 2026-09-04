@@ -42,6 +42,12 @@
   // á netþjóni, skrifar þessa einu skrá - kortið sækir hana í stað þess að
   // lesa EXIF úr hverri mynd hjá hverjum notanda.
   const OLD_PROJECT_GEOJSON_URL = 'eldri-verkefni.geojson';
+  // Handvirkt gikk fyrir Action-ið sem býr til eldri-verkefni.geojson —
+  // krefst persónulegs GitHub token (Actions: write á þessu eina repo),
+  // sett inn og geymt bara í þessum vafra, aldrei sent neitt annað.
+  const WORKFLOW_DISPATCH_URL =
+    `https://api.github.com/repos/${OLD_PROJECT_OWNER}/${OLD_PROJECT_REPO}/actions/workflows/build-old-project-geojson.yml/dispatches`;
+  const GH_TOKEN_KEY = 'jkmap_gh_token_v1';
 
   // Points CSV (mm/leg/guy) — same ISN93 projection as the field-registration CSV.
   const ISN93 =
@@ -877,6 +883,62 @@
     });
     location.reload();
   });
+
+  // ---------------------------------------------------------------------
+  // Keyra "eldri-verkefni.geojson" Action-ið beint úr kortinu.
+  // GitHub leyfir aldrei að ræsa Actions án auðkenningar, svo þetta krefst
+  // persónulegs access token frá þeim sem ýtir á hnappinn - hann er geymdur
+  // eingöngu í localStorage í þeirra eigin vafra, aldrei sendur neitt nema
+  // beint til GitHub. Búðu til fine-grained PAT með "Actions: write"
+  // heimild á nonni123/JarMyndir eingöngu.
+  // ---------------------------------------------------------------------
+  async function runOldProjectAction() {
+    let token = localStorage.getItem(GH_TOKEN_KEY);
+    if (!token) {
+      token = prompt(
+        'GitHub personal access token vantar til að keyra Action-ið.\n' +
+        'Búðu til "fine-grained" token á github.com/settings/tokens með\n' +
+        '"Actions: write" heimild á nonni123/JarMyndir eingöngu.\n' +
+        'Það vistast bara í þessum vafra.'
+      );
+      if (!token) return;
+      try {
+        localStorage.setItem(GH_TOKEN_KEY, token);
+      } catch (err) {
+        console.warn('Gat ekki vistað token.', err);
+      }
+    }
+
+    const btn = document.getElementById('run-action-btn');
+    btn.disabled = true;
+    setStatus('Ræsi Action fyrir eldri-verkefni.geojson…');
+    try {
+      const res = await fetch(WORKFLOW_DISPATCH_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: OLD_PROJECT_BRANCH }),
+      });
+      if (res.status === 204) {
+        setStatus('Action ræst — tekur yfirleitt ~30-60 sek. Ýttu á "🔄 Refresh Photos" á eftir.');
+      } else if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem(GH_TOKEN_KEY);
+        throw new Error('Token hafnað (rangt eða vantar heimild) — reyndu aftur með nýtt token.');
+      } else {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus(`Villa við að ræsa Action: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('run-action-btn').addEventListener('click', runOldProjectAction);
 
   // ---------------------------------------------------------------------
   // Lightbox + navigation — exposed for inline onclick handlers in popups.

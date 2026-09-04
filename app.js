@@ -286,12 +286,16 @@
       }
     });
 
+    // Bæta við í einu (addLayers) í stað addLayer í lykkju - miklu hraðara
+    // fyrir stór söfn og forðast endurtekna innri endurklösun á hverri einustu mynd.
+    const newMarkers = [];
     oldPhotoCache.forEach((photo) => {
       if (photo.invalid || photo.lat == null || photo.lon == null) return;
       const isNew = !oldMarkers.has(photo.id);
       const marker = createOrUpdateMarker(photo, oldMarkers);
-      if (isNew) oldPhotosLayer.addLayer(marker);
+      if (isNew) newMarkers.push(marker);
     });
+    if (newMarkers.length) oldPhotosLayer.addLayers(newMarkers);
 
     renderLegend();
   }
@@ -1303,6 +1307,7 @@
       const bounds = L.latLngBounds(
         Array.from(markersByFilename.values()).map((m) => m.getLatLng())
       );
+      map.invalidateSize();
       map.fitBounds(bounds.pad(0.2), { maxZoom: 14 });
     }
   });

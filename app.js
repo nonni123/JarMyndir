@@ -26,6 +26,18 @@
   const VALID_EXT = /\.(jpe?g)$/i;
   const REFRESH_CONCURRENCY = 4;
 
+  // "Eldri verkefni" — óháð myndamappa (t.d. úr eldri verkefnum) sem lifir í
+  // þessu sama repo-i, ekki tengd neinum mastrapunkti. Sömu EXIF-GPS reglur
+  // gilda og fyrir myndir/ - engin CSV-tenging þarf.
+  const OLD_PROJECT_OWNER = 'nonni123';
+  const OLD_PROJECT_REPO = 'JarMyndir';
+  const OLD_PROJECT_BRANCH = 'main';
+  const OLD_PROJECT_PATH = 'eldri-verkefni';
+  const OLD_PROJECT_RAW_BASE = `https://raw.githubusercontent.com/${OLD_PROJECT_OWNER}/${OLD_PROJECT_REPO}/${OLD_PROJECT_BRANCH}`;
+  const OLD_PROJECT_CONTENTS_URL =
+    `https://api.github.com/repos/${OLD_PROJECT_OWNER}/${OLD_PROJECT_REPO}/contents/${OLD_PROJECT_PATH}?ref=${OLD_PROJECT_BRANCH}`;
+  const OLD_CACHE_KEY = 'jkmap_oldproject_cache_v1';
+
   // Points CSV (mm/leg/guy) — same ISN93 projection as the field-registration CSV.
   const ISN93 =
     '+proj=lcc +lat_1=64.25 +lat_2=65.75 +lat_0=65 +lon_0=-19 +x_0=500000 +y_0=500000 +ellps=GRS80 +units=m +no_defs +type=crs';
@@ -39,6 +51,9 @@
   let photoCache = loadCache();
   /** @type {Map<string, L.Marker>} */
   const markersByFilename = new Map();
+  /** Sjálfstæð "eldri verkefni" myndasöfnun — sami háttur og photoCache. */
+  let oldPhotoCache = loadCacheFrom(OLD_CACHE_KEY);
+  const oldMarkers = new Map();
   let userLocation = null; // { lat, lon, accuracy }
   let userLocationMarker = null;
   let userAccuracyCircle = null;
@@ -50,24 +65,32 @@
   // ---------------------------------------------------------------------
   // localStorage cache helpers
   // ---------------------------------------------------------------------
-  function loadCache() {
+  function loadCacheFrom(key) {
     try {
-      const raw = localStorage.getItem(CACHE_KEY);
+      const raw = localStorage.getItem(key);
       if (!raw) return new Map();
       const obj = JSON.parse(raw);
       return new Map(Object.entries(obj));
     } catch (err) {
-      console.warn('Could not read photo cache, starting empty.', err);
+      console.warn(`Could not read cache "${key}", starting empty.`, err);
       return new Map();
     }
   }
 
-  function saveCache() {
+  function saveCacheTo(key, cache) {
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(photoCache)));
+      localStorage.setItem(key, JSON.stringify(Object.fromEntries(cache)));
     } catch (err) {
-      console.warn('Could not persist photo cache (storage full/blocked?).', err);
+      console.warn(`Could not persist cache "${key}" (storage full/blocked?).`, err);
     }
+  }
+
+  function loadCache() {
+    return loadCacheFrom(CACHE_KEY);
+  }
+
+  function saveCache() {
+    saveCacheTo(CACHE_KEY, photoCache);
   }
 
   // ---------------------------------------------------------------------
@@ -146,9 +169,16 @@
   const pointsLayer = L.layerGroup();
   map.addLayer(pointsLayer);
 
+  const oldPhotosLayer = L.markerClusterGroup({
+    maxClusterRadius: 60,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+  });
+  map.addLayer(oldPhotosLayer);
+
   L.control.layers(
     { 'Kort (OSM)': osmLayer, 'Loftmynd (Esri)': esriLayer },
-    { 'Myndir': clusterGroup, 'Punktar (CSV)': pointsLayer },
+    { 'Myndir': clusterGroup, 'Punktar (CSV)': pointsLayer, 'Eldri verkefni': oldPhotosLayer },
     { position: 'topright' }
   ).addTo(map);
 
@@ -196,10 +226,10 @@
       </div>`;
   }
 
-  function createOrUpdateMarker(photo) {
+  function createOrUpdateMarker(photo, markerMap) {
     if (photo.lat == null || photo.lon == null) return null;
 
-    let marker = markersByFilename.get(photo.id);
+    let marker = markerMap.get(photo.id);
     if (!marker) {
       marker = L.marker([photo.lat, photo.lon], { icon: photoIcon(photo.heading) });
       marker.bindTooltip(photo.filename, {
@@ -209,7 +239,7 @@
         className: 'photo-label',
       });
       marker.bindPopup(() => buildPopupHtml(photo), { maxWidth: 260 });
-      markersByFilename.set(photo.id, marker);
+      markerMap.set(photo.id, marker);
     } else {
       marker.setLatLng([photo.lat, photo.lon]);
       marker.setIcon(photoIcon(photo.heading));
@@ -228,10 +258,30 @@
 
     photoCache.forEach((photo) => {
       if (photo.invalid || photo.lat == null || photo.lon == null) return;
-      createOrUpdateMarker(photo);
+      createOrUpdateMarker(photo, markersByFilename);
     });
 
     applyFilters();
+    renderLegend();
+  }
+
+  // "Eldri verkefni" — óháð lag, ekki síað af leit/dagsetningu, alltaf
+  // sýnt beint í eigin markerClusterGroup þegar það er virkt.
+  function rebuildOldMarkers() {
+    oldMarkers.forEach((marker, id) => {
+      if (!oldPhotoCache.has(id) || oldPhotoCache.get(id).invalid) {
+        oldMarkers.delete(id);
+        oldPhotosLayer.removeLayer(marker);
+      }
+    });
+
+    oldPhotoCache.forEach((photo) => {
+      if (photo.invalid || photo.lat == null || photo.lon == null) return;
+      const isNew = !oldMarkers.has(photo.id);
+      const marker = createOrUpdateMarker(photo, oldMarkers);
+      if (isNew) oldPhotosLayer.addLayer(marker);
+    });
+
     renderLegend();
   }
 
@@ -296,6 +346,14 @@
         <div class="legend-section">
           <h3>Myndir</h3>
           <div class="legend-row"><span class="legend-swatch" style="background:var(--photo)"></span><span class="legend-label">Ljósmynd</span></div>
+        </div>`);
+    }
+
+    if (oldMarkers.size > 0) {
+      sections.push(`
+        <div class="legend-section">
+          <h3>Eldri verkefni</h3>
+          <div class="legend-row"><span class="legend-swatch" style="background:var(--photo)"></span><span class="legend-label">Ljósmynd (${oldMarkers.size})</span></div>
         </div>`);
     }
 
@@ -626,11 +684,13 @@
       });
 
       const cloudResult = await loadCloudPhotosFromCsv();
+      const oldResult = await refreshOldProjectPhotos();
 
       saveCache();
       rebuildMarkersFromCache();
       const cloudNote = cloudResult.ok ? `, ${cloudResult.added} nýjar úr Cloudinary` : '';
-      setStatus(`Uppfært kl. ${new Date().toLocaleTimeString('is-IS')} — ${toProcess.length} nýjar/breyttar úr myndir/${cloudNote}, ${photoCache.size} samtals.`);
+      const oldNote = oldResult.added ? `, ${oldResult.added} nýjar úr eldri verkefnum` : '';
+      setStatus(`Uppfært kl. ${new Date().toLocaleTimeString('is-IS')} — ${toProcess.length} nýjar/breyttar úr myndir/${cloudNote}${oldNote}, ${photoCache.size} samtals.`);
     } catch (err) {
       console.error(err);
       setStatus(`Villa við endurhleðslu: ${err.message}`);
@@ -640,6 +700,67 @@
   }
 
   document.getElementById('refresh-btn').addEventListener('click', refreshPhotos);
+
+  // ---------------------------------------------------------------------
+  // "Eldri verkefni" — óháð myndamappa, engin CSV-tenging, sama EXIF-GPS
+  // aðferð og fyrir myndir/. Keyrir sjálfkrafa við ræsingu og með
+  // "🔄 Refresh Photos" hnappinum, ofan á aðal-myndaleitina.
+  // ---------------------------------------------------------------------
+  async function fetchOldProjectListing() {
+    const res = await fetch(OLD_PROJECT_CONTENTS_URL, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (res.status === 404) return []; // mappan er ekki til (enn) - ekki villa
+    if (!res.ok) {
+      throw new Error(`GitHub API villa: HTTP ${res.status}`);
+    }
+    const items = await res.json();
+    return items.filter((it) => it.type === 'file' && VALID_EXT.test(it.name));
+  }
+
+  async function refreshOldProjectPhotos() {
+    try {
+      const listing = await fetchOldProjectListing();
+      const liveNames = new Set(listing.map((it) => it.name));
+
+      Array.from(oldPhotoCache.keys()).forEach((id) => {
+        if (!liveNames.has(id)) oldPhotoCache.delete(id);
+      });
+
+      const toProcess = listing.filter((it) => {
+        const cached = oldPhotoCache.get(it.name);
+        return !cached || cached.sha !== it.sha;
+      });
+
+      await runWithConcurrency(toProcess, REFRESH_CONCURRENCY, async (item) => {
+        try {
+          const res = await fetch(item.download_url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const exif = await readExifFromBuffer(await res.arrayBuffer());
+          oldPhotoCache.set(item.name, {
+            id: item.name,
+            filename: item.name,
+            imageUrl: `${OLD_PROJECT_RAW_BASE}/${OLD_PROJECT_PATH}/${item.name}`,
+            sha: item.sha,
+            lat: exif.lat,
+            lon: exif.lon,
+            date: exif.date,
+            heading: exif.heading,
+            invalid: exif.lat == null,
+          });
+        } catch (err) {
+          console.warn(`Villa við að lesa ${item.name} (eldri verkefni):`, err);
+        }
+      });
+
+      saveCacheTo(OLD_CACHE_KEY, oldPhotoCache);
+      rebuildOldMarkers();
+      return { ok: true, added: toProcess.length };
+    } catch (err) {
+      console.warn('Gat ekki sótt eldri-verkefni myndir.', err);
+      return { ok: false, added: 0 };
+    }
+  }
 
   // ---------------------------------------------------------------------
   // My Location
@@ -702,7 +823,7 @@
   // ---------------------------------------------------------------------
   document.getElementById('clear-cache-btn').addEventListener('click', () => {
     if (!confirm('Hreinsa öll vistuð gögn (myndir, punktar, lög) úr þessum vafra og endurhlaða?')) return;
-    [CACHE_KEY, POINTS_CACHE_KEY, SHAPE_CACHE_KEY].forEach((key) => {
+    [CACHE_KEY, POINTS_CACHE_KEY, SHAPE_CACHE_KEY, OLD_CACHE_KEY].forEach((key) => {
       try {
         localStorage.removeItem(key);
       } catch (err) {
@@ -1051,9 +1172,10 @@
   updateLabelVisibility();
   loadCachedShapes(); // undirlag - alltaf fyrst svo það haldist neðst
   rebuildMarkersFromCache(); // paint whatever's already cached from a previous visit
+  rebuildOldMarkers(); // paint cached "eldri verkefni" photos too
   loadCachedPoints(); // paint any previously-imported points CSV
   setStatus('Sæki myndalista…');
-  Promise.all([loadPrebuiltGeojson(), loadCloudPhotosFromCsv()]).then(([geoResult, cloudResult]) => {
+  Promise.all([loadPrebuiltGeojson(), loadCloudPhotosFromCsv(), refreshOldProjectPhotos()]).then(([geoResult, cloudResult]) => {
     rebuildMarkersFromCache();
     const addedCloud = cloudResult.ok ? cloudResult.added : 0;
     if (geoResult.ok) {

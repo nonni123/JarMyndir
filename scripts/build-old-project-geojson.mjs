@@ -10,7 +10,8 @@ import exifr from 'exifr';
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'lthr3qec';
 const API_KEY = process.env.CLOUDINARY_API_KEY;
 const API_SECRET = process.env.CLOUDINARY_API_SECRET;
-const FOLDER_PREFIX = 'eldri-verkefni/';
+const FOLDER_NAME = 'eldri-verkefni';
+const FOLDER_PREFIX = `${FOLDER_NAME}/`;
 const OUTPUT_FILE = path.join(process.cwd(), '..', 'eldri-verkefni.geojson');
 
 if (!API_KEY || !API_SECRET) {
@@ -19,19 +20,25 @@ if (!API_KEY || !API_SECRET) {
 
 const authHeader = 'Basic ' + Buffer.from(`${API_KEY}:${API_SECRET}`).toString('base64');
 
+// Notar Search API (ekki eldri prefix-byggða Resources API), því "asset_folder"
+// og "public_id" eru aðskilin gögn í Cloudinary-reikningum með "Dynamic Folders"
+// - mynd getur legið í möppunni "eldri-verkefni" í viðmótinu án þess að
+// public_id byrji nokkurn tímann á "eldri-verkefni/". Leitum að hvoru tveggja.
 async function listAllResources() {
   const resources = [];
   let cursor = undefined;
+  const expression = `(asset_folder="${FOLDER_NAME}" OR public_id:${FOLDER_PREFIX}*) AND resource_type:image`;
   do {
-    const url = new URL(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`);
-    url.searchParams.set('type', 'upload');
-    url.searchParams.set('prefix', FOLDER_PREFIX);
-    url.searchParams.set('max_results', '500');
-    if (cursor) url.searchParams.set('next_cursor', cursor);
+    const body = { expression, max_results: 500 };
+    if (cursor) body.next_cursor = cursor;
 
-    const res = await fetch(url, { headers: { Authorization: authHeader } });
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search`, {
+      method: 'POST',
+      headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
     if (!res.ok) {
-      throw new Error(`Cloudinary Admin API villa: HTTP ${res.status} - ${await res.text()}`);
+      throw new Error(`Cloudinary Search API villa: HTTP ${res.status} - ${await res.text()}`);
     }
     const data = await res.json();
     resources.push(...(data.resources || []));
@@ -68,7 +75,10 @@ async function readExifFromUrl(url) {
 
 async function main() {
   const resources = await listAllResources();
-  console.log(`Fann ${resources.length} myndir undir ${FOLDER_PREFIX} á Cloudinary.`);
+  console.log(`Fann ${resources.length} myndir undir "${FOLDER_NAME}" á Cloudinary.`);
+  resources.slice(0, 5).forEach((r) => {
+    console.log(`  - public_id=${r.public_id} asset_folder=${r.asset_folder || '(ekkert)'} format=${r.format}`);
+  });
 
   const existing = await loadExistingGeojson();
   const existingByPublicId = new Map(
@@ -88,7 +98,10 @@ async function main() {
       continue;
     }
 
-    const filename = resource.public_id.slice(FOLDER_PREFIX.length) + '.' + resource.format;
+    const baseName = resource.public_id.startsWith(FOLDER_PREFIX)
+      ? resource.public_id.slice(FOLDER_PREFIX.length)
+      : resource.public_id.split('/').pop();
+    const filename = `${baseName}.${resource.format}`;
     try {
       const exif = await readExifFromUrl(resource.secure_url);
       if (exif.lat == null || exif.lon == null) {

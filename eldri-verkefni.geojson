@@ -1,5 +1,330 @@
 {
   "type": "FeatureCollection",
-  "generatedAt": "2026-09-04T14:37:17.611Z",
-  "features": []
+  "generatedAt": "2026-09-04T14:50:21.329Z",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.817304083333333,
+          65.414046
+        ]
+      },
+      "properties": {
+        "filename": "jv50jkhtdz442ezbandi.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532600/jv50jkhtdz442ezbandi.jpg",
+        "publicId": "jv50jkhtdz442ezbandi",
+        "version": 1788532600,
+        "date": "2026-09-02T02:57:32.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.817304055555557,
+          65.414046
+        ]
+      },
+      "properties": {
+        "filename": "l4wg0dfwkbpoca4etyx9.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532586/l4wg0dfwkbpoca4etyx9.jpg",
+        "publicId": "l4wg0dfwkbpoca4etyx9",
+        "version": 1788532586,
+        "date": "2026-09-02T02:57:30.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.817295555555557,
+          65.41404477777779
+        ]
+      },
+      "properties": {
+        "filename": "x1iy4yo9hnxwd0nh7zyk.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532527/x1iy4yo9hnxwd0nh7zyk.jpg",
+        "publicId": "x1iy4yo9hnxwd0nh7zyk",
+        "version": 1788532527,
+        "date": "2026-09-02T02:57:24.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.817295055555554,
+          65.41404472222223
+        ]
+      },
+      "properties": {
+        "filename": "aolhv7ldxmvqh5r2dlyf.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532473/aolhv7ldxmvqh5r2dlyf.jpg",
+        "publicId": "aolhv7ldxmvqh5r2dlyf",
+        "version": 1788532473,
+        "date": "2026-09-02T02:57:23.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.817293694444444,
+          65.4140446388889
+        ]
+      },
+      "properties": {
+        "filename": "x3vpn2ynzlohrkygwhhy.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532472/x3vpn2ynzlohrkygwhhy.jpg",
+        "publicId": "x3vpn2ynzlohrkygwhhy",
+        "version": 1788532472,
+        "date": "2026-09-02T02:57:21.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.81872088888889,
+          65.41448619444445
+        ]
+      },
+      "properties": {
+        "filename": "zc92suhwjklu7xgztwfo.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532471/zc92suhwjklu7xgztwfo.jpg",
+        "publicId": "zc92suhwjklu7xgztwfo",
+        "version": 1788532471,
+        "date": "2026-09-02T02:57:07.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.81872088888889,
+          65.41448619444445
+        ]
+      },
+      "properties": {
+        "filename": "d7ipvisljgigxqfsjerz.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532471/d7ipvisljgigxqfsjerz.jpg",
+        "publicId": "d7ipvisljgigxqfsjerz",
+        "version": 1788532471,
+        "date": "2026-09-02T02:57:06.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.81872075,
+          65.41448625000001
+        ]
+      },
+      "properties": {
+        "filename": "og8gpmpehvfgjcbkpxvi.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532470/og8gpmpehvfgjcbkpxvi.jpg",
+        "publicId": "og8gpmpehvfgjcbkpxvi",
+        "version": 1788532470,
+        "date": "2026-09-02T02:57:04.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.818718611111112,
+          65.41448733333334
+        ]
+      },
+      "properties": {
+        "filename": "jlqxz4ba6fpsho1ofzbs.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532469/jlqxz4ba6fpsho1ofzbs.jpg",
+        "publicId": "jlqxz4ba6fpsho1ofzbs",
+        "version": 1788532469,
+        "date": "2026-09-02T02:57:00.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.818718555555556,
+          65.41448730555557
+        ]
+      },
+      "properties": {
+        "filename": "imd7u1g3rxmqn5dtktsz.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532469/imd7u1g3rxmqn5dtktsz.jpg",
+        "publicId": "imd7u1g3rxmqn5dtktsz",
+        "version": 1788532469,
+        "date": "2026-09-02T02:56:58.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.8187185,
+          65.41448769444445
+        ]
+      },
+      "properties": {
+        "filename": "sqm5foowiricvzbvyrlv.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532468/sqm5foowiricvzbvyrlv.jpg",
+        "publicId": "sqm5foowiricvzbvyrlv",
+        "version": 1788532468,
+        "date": "2026-09-02T02:56:57.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.818719777777776,
+          65.41448883333334
+        ]
+      },
+      "properties": {
+        "filename": "pszdqqfqhyn7dlqzrcdh.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532467/pszdqqfqhyn7dlqzrcdh.jpg",
+        "publicId": "pszdqqfqhyn7dlqzrcdh",
+        "version": 1788532467,
+        "date": "2026-09-02T02:56:53.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.818719777777776,
+          65.41448883333334
+        ]
+      },
+      "properties": {
+        "filename": "hyestizw3elgcrx47fpn.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532466/hyestizw3elgcrx47fpn.jpg",
+        "publicId": "hyestizw3elgcrx47fpn",
+        "version": 1788532466,
+        "date": "2026-09-02T02:56:51.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.81872027777778,
+          65.41448897222223
+        ]
+      },
+      "properties": {
+        "filename": "ljhwvkdmdwvt5cigjw5c.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532466/ljhwvkdmdwvt5cigjw5c.jpg",
+        "publicId": "ljhwvkdmdwvt5cigjw5c",
+        "version": 1788532466,
+        "date": "2026-09-02T02:56:50.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.818732,
+          65.41448480555556
+        ]
+      },
+      "properties": {
+        "filename": "jvcl9rciqqqjpbrsjv9d.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532466/jvcl9rciqqqjpbrsjv9d.jpg",
+        "publicId": "jvcl9rciqqqjpbrsjv9d",
+        "version": 1788532466,
+        "date": "2026-09-02T02:56:45.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.81873288888889,
+          65.41448600000001
+        ]
+      },
+      "properties": {
+        "filename": "kmnrrivhfhmld2lmu8pk.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532465/kmnrrivhfhmld2lmu8pk.jpg",
+        "publicId": "kmnrrivhfhmld2lmu8pk",
+        "version": 1788532465,
+        "date": "2026-09-02T02:56:43.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -19.818734944444444,
+          65.41448933333334
+        ]
+      },
+      "properties": {
+        "filename": "payc6aogsni6q7lvntm6.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532465/payc6aogsni6q7lvntm6.jpg",
+        "publicId": "payc6aogsni6q7lvntm6",
+        "version": 1788532465,
+        "date": "2026-09-02T02:56:42.000Z",
+        "heading": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -20.22126519444444,
+          65.62285497222221
+        ]
+      },
+      "properties": {
+        "filename": "ptreab1jygnnwgnspwxc.jpg",
+        "url": "https://res.cloudinary.com/lthr3qec/image/upload/v1788532465/ptreab1jygnnwgnspwxc.jpg",
+        "publicId": "ptreab1jygnnwgnspwxc",
+        "version": 1788532465,
+        "date": "2026-09-03T02:58:53.000Z",
+        "heading": null
+      }
+    }
+  ]
 }

@@ -1,0 +1,45 @@
+name: Build eldri-verkefni.geojson
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Cloudinary-upphal kemur ekki með neinu "push" atviki hingað, svo þetta
+    # keyrir reglulega af sjálfu sér - breyttu tímanum eftir þörf.
+    - cron: '0 6 * * *' # daglega kl. 06:00 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-old-project-geojson
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install build dependencies
+        working-directory: scripts
+        run: npm install
+
+      - name: Build eldri-verkefni.geojson
+        working-directory: scripts
+        run: npm run build:old-project
+        env:
+          CLOUDINARY_CLOUD_NAME: lthr3qec
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add eldri-verkefni.geojson
+          git diff --cached --quiet || git commit -m "chore: rebuild eldri-verkefni.geojson"
+          git push

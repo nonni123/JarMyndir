@@ -37,6 +37,11 @@
   const OLD_PROJECT_CONTENTS_URL =
     `https://api.github.com/repos/${OLD_PROJECT_OWNER}/${OLD_PROJECT_REPO}/contents/${OLD_PROJECT_PATH}?ref=${OLD_PROJECT_BRANCH}`;
   const OLD_CACHE_KEY = 'jkmap_oldproject_cache_v1';
+  // Fyrir stór/stækkandi söfn (1000+ myndir) af sömu eldri verkefnum, hlaðið
+  // beint upp á Cloudinary: GitHub Action les Cloudinary Admin API og EXIF
+  // á netþjóni, skrifar þessa einu skrá - kortið sækir hana í stað þess að
+  // lesa EXIF úr hverri mynd hjá hverjum notanda.
+  const OLD_PROJECT_GEOJSON_URL = 'eldri-verkefni.geojson';
 
   // Points CSV (mm/leg/guy) — same ISN93 projection as the field-registration CSV.
   const ISN93 =
@@ -684,7 +689,9 @@
       });
 
       const cloudResult = await loadCloudPhotosFromCsv();
+      const oldGeoResult = await loadOldProjectGeojson();
       const oldResult = await refreshOldProjectPhotos();
+      oldResult.added = (oldResult.added || 0) + oldGeoResult.added;
 
       saveCache();
       rebuildMarkersFromCache();
@@ -705,7 +712,45 @@
   // "Eldri verkefni" — óháð myndamappa, engin CSV-tenging, sama EXIF-GPS
   // aðferð og fyrir myndir/. Keyrir sjálfkrafa við ræsingu og með
   // "🔄 Refresh Photos" hnappinum, ofan á aðal-myndaleitina.
+  //
+  // Tvær gagnaleiðir sem báðar skrifa í sama oldPhotoCache:
+  //  1) Forreiknuð eldri-verkefni.geojson (GitHub Action + Cloudinary,
+  //     hentar fyrir stór/stækkandi söfn - engin EXIF-lesning í vafra).
+  //  2) Bein GitHub-möppulisting + EXIF-lestur í vafra (hentar fyrir
+  //     fáar myndir settar beint inn í eldri-verkefni/ í þessu repo-i).
   // ---------------------------------------------------------------------
+  async function loadOldProjectGeojson() {
+    try {
+      const res = await fetch(`${OLD_PROJECT_GEOJSON_URL}?_=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const geojson = await res.json();
+      let added = 0;
+      for (const feature of geojson.features || []) {
+        const props = feature.properties || {};
+        const [lon, lat] = feature.geometry.coordinates;
+        const id = props.publicId || props.url;
+        const existing = oldPhotoCache.get(id);
+        if (existing && existing.sha === props.version) continue;
+        oldPhotoCache.set(id, {
+          id,
+          filename: props.filename,
+          imageUrl: props.url,
+          sha: props.version,
+          lat,
+          lon,
+          date: props.date,
+          heading: props.heading,
+        });
+        added++;
+      }
+      saveCacheTo(OLD_CACHE_KEY, oldPhotoCache);
+      return { ok: true, added };
+    } catch (err) {
+      console.warn('Gat ekki sótt eldri-verkefni.geojson (Action gæti ekki hafa keyrt enn).', err);
+      return { ok: false, added: 0 };
+    }
+  }
+
   async function fetchOldProjectListing() {
     const res = await fetch(OLD_PROJECT_CONTENTS_URL, {
       headers: { Accept: 'application/vnd.github+json' },
@@ -1175,8 +1220,9 @@
   rebuildOldMarkers(); // paint cached "eldri verkefni" photos too
   loadCachedPoints(); // paint any previously-imported points CSV
   setStatus('Sæki myndalista…');
-  Promise.all([loadPrebuiltGeojson(), loadCloudPhotosFromCsv(), refreshOldProjectPhotos()]).then(([geoResult, cloudResult]) => {
+  Promise.all([loadPrebuiltGeojson(), loadCloudPhotosFromCsv(), loadOldProjectGeojson(), refreshOldProjectPhotos()]).then(([geoResult, cloudResult]) => {
     rebuildMarkersFromCache();
+    rebuildOldMarkers(); // tryggir að bæði eldri-verkefni gagnaleiðirnar séu að fullu teiknaðar
     const addedCloud = cloudResult.ok ? cloudResult.added : 0;
     if (geoResult.ok) {
       setStatus(`${photoCache.size} myndir hlaðnar (${geoResult.added} nýjar/breyttar úr photos.geojson, ${addedCloud} úr Cloudinary).`);
